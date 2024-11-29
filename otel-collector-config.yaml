@@ -1,0 +1,56 @@
+# This is an example configuration file for the OpenTelemetry Collector.
+
+# The extensions' configuration.
+extensions:
+  health_check:
+    endpoint: ${env:MY_POD_IP}:13133  # Default endpoint is 0.0.0.0:13133
+
+# The receiver configuration.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: ${env:MY_POD_IP}:4317
+      http:
+        endpoint: ${env:MY_POD_IP}:4318
+
+# The exporter configuration.
+exporters:
+  prometheusremotewrite:
+    endpoint: ${env:PROMETHEUS_WRITE_ENDPOINT}
+  datadog:
+    hostname: "${env:NODE_NAME}"
+    api:
+      site: datadoghq.com
+      key: ${env:DD_API_KEY}
+    host_metadata:
+      enabled: true
+      hostname_source: config_or_system
+
+# The processor configuration.
+processors:
+  batch:
+    send_batch_max_size: 100
+    send_batch_size: 10
+    timeout: 10s
+
+# The connector configuration.
+connectors:
+  datadog/connector: {}
+
+# The service configuration.
+service:
+  extensions: [health_check]
+  pipelines:
+    metrics:
+      receivers: [otlp, datadog/connector]
+      processors: [batch]
+      exporters: [datadog, prometheusremotewrite]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [datadog/connector]
+    traces/2:
+      receivers: [datadog/connector]
+      processors: [batch]
+      exporters: [datadog]

@@ -1,0 +1,62 @@
+services:
+  dd-agent:
+    image: gcr.io/datadoghq/agent:7
+    platform: linux/amd64
+    restart: unless-stopped
+    environment:
+      DD_HOSTNAME: ddagent
+      DD_SITE: datadoghq.com
+      DD_API_KEY: ${DD_API_KEY}
+    ports:
+      - "8125:8125/udp"
+      - "8126:8126"
+    pid: "host"
+    cgroup_parent: "host"
+
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:0.114.0
+    user: $DOCKER_USER
+    platform: linux/amd64
+    restart: always
+    command:
+      - "--config=/etc/otel/config/otel-collector-config.yaml"
+      - "--feature-gates=-exporter.datadogexporter.DisableAPMStats"
+    environment:
+      DD_API_KEY: ${DD_API_KEY}
+      NODE_NAME: ${NODE_NAME}
+    ports:
+      - "4317:4317" # OTLP gRPC endpoint
+      - "4318:4318" # OTLP HTTP endpoint (optional)
+      - "13133:13133"
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel/config/otel-collector-config.yaml:ro
+      - /etc/passwd:/etc/passwd:ro
+      - ./docker-data/otel-collector/tmp:/tmp
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:13133/healthz"]
+
+  service-dd-sdk:
+    build:
+      context: ./dd-sdk
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    environment:
+      PORT: ":8081"
+      DATADOG_AGENT_HOST: "dd-agent"
+    ports:
+      - "8081:8081"
+    depends_on:
+      - dd-agent
+
+  service-otel-sdk:
+    build:
+      context: ./otel-sdk
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    environment:
+      PORT: ":8082"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "otel-collector:4318"
+    ports:
+      - "8082:8082"
+    depends_on:
+      - otel-collector

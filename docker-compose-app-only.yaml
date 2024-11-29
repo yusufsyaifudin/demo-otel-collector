@@ -1,0 +1,22 @@
+services:
+  service-dd-sdk:
+    build:
+      context: ./dd-sdk
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    environment:
+      PORT: ":8081"
+      DATADOG_AGENT_HOST: ${DATADOG_AGENT_HOST}
+    ports:
+      - "8081:8081"
+
+  service-otel-sdk:
+    build:
+      context: ./otel-sdk
+      dockerfile: Dockerfile
+    platform: linux/amd64
+    environment:
+      PORT: ":8082"
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT}
+    ports:
+      - "8082:8082"

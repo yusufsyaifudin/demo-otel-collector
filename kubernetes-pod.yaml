@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-otel-collector-dd-sdk
+spec:
+  containers:
+    - name: dd-sdk
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-xxx
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: PORT
+          value: "8081"
+        - name: DATADOG_AGENT_HOST
+          value: "datadog-apm.datadog.svc"
+      ports:
+        - name: dd-sdk-http
+          containerPort: 8081
+          hostPort: 80
+          protocol: TCP
+  restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-otel-collector-otel-sdk
+spec:
+  containers:
+    - name: otel-sdk
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-xxx
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: PORT
+          value: "8081"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "opentelemetry-collector.otel-collector.svc:4318"
+      ports:
+        - name: otel-sdk
+          containerPort: 8082
+          hostPort: 80
+          protocol: TCP
+  restartPolicy: Always
