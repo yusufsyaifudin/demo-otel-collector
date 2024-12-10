@@ -166,8 +166,8 @@ func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPEn
 		otelSdkMetric.WithResource(otelResources),
 		otelSdkMetric.WithReader(
 			otelSdkMetric.NewPeriodicReader(metricExporter,
-				// Default is 1m.
-				otelSdkMetric.WithInterval(1*time.Minute),
+				// Default is 1m. Set to 3s for demonstrative purposes.
+				otelSdkMetric.WithInterval(3*time.Second),
 				otelSdkMetric.WithTimeout(1*time.Minute),
 			),
 		),
