@@ -101,13 +101,6 @@ func main() {
 			return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 		}),
 		otelhttp.WithMeterProvider(otel.GetMeterProvider()),
-		otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
-			return []attribute.KeyValue{
-				attribute.String("http.method", r.Method),
-				attribute.String("http.route", r.URL.Path),
-				attribute.String("http.status", r.URL.Path),
-			}
-		}),
 	))
 	router.Use(MetricsMiddleware(serviceName))
 
@@ -173,8 +166,8 @@ func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPEn
 		otelSdkMetric.WithResource(otelResources),
 		otelSdkMetric.WithReader(
 			otelSdkMetric.NewPeriodicReader(metricExporter,
-				// Default is 1m. Set to 3s for demonstrative purposes.
-				otelSdkMetric.WithInterval(3*time.Second),
+				// Default is 1m.
+				otelSdkMetric.WithInterval(1*time.Minute),
 				otelSdkMetric.WithTimeout(1*time.Minute),
 			),
 		),
