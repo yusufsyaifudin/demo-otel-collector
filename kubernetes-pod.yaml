@@ -5,7 +5,7 @@ metadata:
 spec:
   containers:
     - name: dd-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-423a878
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-5080211
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
@@ -28,7 +28,7 @@ metadata:
 spec:
   containers:
     - name: otel-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-423a878
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-5080211
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
