@@ -31,7 +31,93 @@ What is the environment used for?
 * `DD_API_KEY` is the Datadog API key. This is used to send traces and metrics to Datadog.
 * `DOCKER_USER` is the user and group that should be used to run the application. This is used to avoid permission issues when writing to the log file.
 * `PROMETHEUS_WRITE_ENDPOINT` is the Prometheus Write endpoint (or Pushgateway) where the metrics should be sent. This is used to send metrics to Prometheus.
-
+[cfs-staging-alicloud-beta.sh](../kubectx/cfs-staging-alicloud-beta.sh)
 All of these environment is not needed by the application, but only for Datadog Agent and OpenTelemetry Colletor Agent.
 
+
+## What Metrics Emitted By The Application
+
+### dd-sdk
+
+The application emits the following metrics:
+* `poc_dd_sdk_statsd.login.success`: The number of successful login requests.
+* `poc_dd_sdk_statsd.login.failure`: The number of failed login requests. With the tags `reason`.
+
+
+### otel-sdk
+
+> Note, Grafana Mimir uses `_` and not `.`, so `poc_otel_sdk.login.success` will become `poc_otel_sdk_login_success` as metric name in the Grafana Mimir.
+
+The application emits the following metrics:
+
+* `poc_otel_sdk.login.success`: The number of successful login requests.
+* `poc_otel_sdk.login.failure`: The number of failed login requests. With the tags `failure_reason`.
+* `poc_otel_sdk.http_server_requests_total`: The number of HTTP requests. With the tags `http.method`, `http.route`, and `http.status`.
+* `poc_otel_sdk.http_server_request_duration_ms`: The duration of the HTTP request. With the tags `http.method`, `http.route`, and `http.status`.
+
+But, the OpenTelemetry Library also emits the following metrics:
+
+https://github.com/open-telemetry/opentelemetry-go-contrib/blob/v1.32.0/instrumentation/net/http/otelhttp/internal/semconv/v1.20.0.go#L81-L85
+
+* `http.server.request.size`
+* `http.server.response.size`
+* `"http.server.duration`
+
+## Demo
+
+Supposed you already have installed Datadog Agent and OpenTelemetry Collector Agent in the same cluster, and:
+
+```shell
+DATADOG_AGENT_HOST=datadog-apm.datadog.svc
+OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector.datadog.svc:4317
+```
+
+Then, run the application
+
+```shell
+kubectl create namespace otel-demo
+kubectl apply -n otel-demo -f kubernetes-pod.yaml
+```
+
+Then port-forward the application to your local machine
+
+```shell
+kubectl port-forward -n otel-demo pod/demo-otel-collector-dd-sdk 8081:8081
+kubectl port-forward -n otel-demo pod/demo-otel-collector-otel-sdk 8082:8082
+```
+
+If you want to port forward to your local IP:
+
+```shell
+kubectl port-forward -n otel-demo pod/demo-otel-collector-dd-sdk 8081:8081 --address 192.168.1.34
+
+kubectl port-forward -n otel-demo pod/demo-otel-collector-otel-sdk 8082:8082 --address 192.168.1.34
+```
+
+Then, open the browser and access the application:
+
+```shell
+# dd-sdk
+curl http://localhost:8081
+
+# otel-sdk
+curl http://localhost:8082
+```
+
+
+Other endpoint is login:
+
+```shell
+# dd-sdk
+curl -X POST http://localhost:8081/login -d '{"username": "user1", "password": "password1"}'
+
+# otel-sdk
+curl -X POST http://localhost:8082/login -d '{"username": "user1", "password": "password1"}'
+```
+
+Try using `k6`:
+
+```shell
+docker run --platform linux/amd64 --network host --rm -i -v $(pwd)/k6:/k6 docker.io/grafana/k6:0.55.0 run /k6/login.js
+```
 

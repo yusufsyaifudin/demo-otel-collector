@@ -101,6 +101,13 @@ func main() {
 			return fmt.Sprintf("%s %s", r.Method, r.URL.Path)
 		}),
 		otelhttp.WithMeterProvider(otel.GetMeterProvider()),
+		otelhttp.WithMetricAttributesFn(func(r *http.Request) []attribute.KeyValue {
+			return []attribute.KeyValue{
+				attribute.String("http.method", r.Method),
+				attribute.String("http.route", r.URL.Path),
+				attribute.String("http.status", r.URL.Path),
+			}
+		}),
 	))
 	router.Use(MetricsMiddleware(serviceName))
 
@@ -298,19 +305,21 @@ func MetricsMiddleware(svcName string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			startTime := time.Now()
 
-			tags := []attribute.KeyValue{
-				attribute.String("http.method", r.Method),
-				attribute.String("http.route", r.URL.Path),
-			}
-
-			// Increment the request count
-			requestCount.Add(r.Context(), 1, metric.WithAttributes(tags...))
-
 			// Process the request
 			next.ServeHTTP(w, r)
 
 			// Record metrics
 			duration := time.Since(startTime).Milliseconds()
+
+			tags := []attribute.KeyValue{
+				attribute.String("http.method", r.Method),
+				attribute.String("http.route", r.URL.Path),
+				attribute.String("http.status", r.URL.Path),
+			}
+
+			// Increment the request count
+			requestCount.Add(r.Context(), 1, metric.WithAttributes(tags...))
+
 			requestLatency.Record(r.Context(), duration, metric.WithAttributes(tags...))
 		})
 	}

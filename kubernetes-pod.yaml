@@ -5,17 +5,18 @@ metadata:
 spec:
   containers:
     - name: dd-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-xxx
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-6698857
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
-          value: "8081"
+          value: ":8081"
+        # Must expose port 8125 for the agent to send traces, and port 8126 for statsd.
         - name: DATADOG_AGENT_HOST
           value: "datadog-apm.datadog.svc"
       ports:
         - name: dd-sdk-http
           containerPort: 8081
-          hostPort: 80
+          hostPort: 8081
           protocol: TCP
   restartPolicy: Always
 
@@ -27,16 +28,17 @@ metadata:
 spec:
   containers:
     - name: otel-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-xxx
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-6698857
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
-          value: "8081"
+          value: ":8082"
+        # Must be an HTTP endpoint
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "opentelemetry-collector.otel-collector.svc:4318"
       ports:
-        - name: otel-sdk
+        - name: otel-sdk-http
           containerPort: 8082
-          hostPort: 80
+          hostPort: 8082
           protocol: TCP
   restartPolicy: Always
