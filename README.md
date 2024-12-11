@@ -123,9 +123,10 @@ docker run --platform linux/amd64 --network host --rm -i -v $(pwd)/k6:/k6 docker
 
 ## Prometheus
 
-If you have Prometheus installed, you can add /metrics endpoint on the OpenTelemetry Collector Agent.
+If you have Prometheus installed, you can add /metrics endpoint on the Prometheus.
+Set `OTLP_METRIC_HTTP_ENABLED=false` to ensure you only emit metric via the Prometheus only.
+But, this is not recommended, because you will lose the ability to send the metrics to the OpenTelemetry Collector Agent (the Datadog metric won't be sent).
 
 ```shell
 demo-otel-collector-otel-sdk.<namespace>.svc/metrics
 ```
-
