@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: demo-otel-collector-dd-sdk
+  labels:
+    app: demo-otel-collector-dd-sdk
 spec:
   containers:
     - name: dd-sdk
@@ -22,9 +24,26 @@ spec:
 
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  name: demo-otel-collector-dd-sdk
+spec:
+  selector:
+      app: demo-otel-collector-dd-sdk
+  ports:
+      - name: dd-sdk-http
+        protocol: TCP
+        port: 80
+        targetPort: 8081
+  type: ClusterIP
+
+---
+apiVersion: v1
 kind: Pod
 metadata:
   name: demo-otel-collector-otel-sdk
+  labels:
+    app: demo-otel-collector-otel-sdk
 spec:
   containers:
     - name: otel-sdk
@@ -36,9 +55,26 @@ spec:
         # Must be an HTTP endpoint
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "opentelemetry-collector.otel-collector.svc:4318"
+        - name: OTLP_METRIC_HTTP_ENABLED
+          value: "true"
       ports:
         - name: otel-sdk-http
           containerPort: 8082
           hostPort: 8082
           protocol: TCP
   restartPolicy: Always
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-otel-collector-otel-sdk
+spec:
+  selector:
+    app: demo-otel-collector-otel-sdk
+  ports:
+    - name: otel-sdk-http
+      protocol: TCP
+      port: 80
+      targetPort: 8082
+  type: ClusterIP

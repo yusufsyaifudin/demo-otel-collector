@@ -121,3 +121,11 @@ Try using `k6`:
 docker run --platform linux/amd64 --network host --rm -i -v $(pwd)/k6:/k6 docker.io/grafana/k6:0.55.0 run /k6/login.js
 ```
 
+## Prometheus
+
+If you have Prometheus installed, you can add /metrics endpoint on the OpenTelemetry Collector Agent.
+
+```shell
+demo-otel-collector-otel-sdk.<namespace>.svc/metrics
+```
+

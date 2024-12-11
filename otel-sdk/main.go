@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -51,6 +52,7 @@ func main() {
 		// OpenTemeletryHTTPEndpoint contains OpenTelemetry HTTP Exporter, for example: "localhost:4318"
 		// No need scheme "http://" or "https://" prefix.
 		OpenTemeletryHTTPEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
+		OtlpMetricHTTPEnabled     = os.Getenv("OTLP_METRIC_HTTP_ENABLED")
 	)
 
 	const (
@@ -78,7 +80,13 @@ func main() {
 		}
 	}()
 
-	meterCloser := initMeter(ctx, otelSdkResources, OpenTemeletryHTTPEndpoint)
+	otelMetricEnabled, otelMetricEnabledErr := strconv.ParseBool(OtlpMetricHTTPEnabled)
+	if otelMetricEnabledErr != nil {
+		slog.WarnContext(ctx, "failed to parse OtlpMetricHTTPEnabled", slog.Any("error", otelMetricEnabledErr))
+		otelMetricEnabled = false
+	}
+
+	meterCloser := initMeter(ctx, otelSdkResources, otelMetricEnabled, OpenTemeletryHTTPEndpoint)
 	defer func() {
 		if _err := meterCloser(ctx); _err != nil {
 			slog.ErrorContext(ctx, "shutdown otel meter error", slog.Any("error", _err))
@@ -121,40 +129,49 @@ func main() {
 	}
 }
 
-func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPEndpoint string) func(ctx context.Context) error {
+func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPMetricEnabled bool, otelHTTPEndpoint string) func(ctx context.Context) error {
+
+	metricExporterStdout, metricExporterStdoutErr := stdoutmetric.New()
+	if metricExporterStdoutErr != nil {
+		slog.ErrorContext(ctx, "failed to create the OpenTelemetry metric stdout exporter", slog.Any("error", metricExporterStdoutErr))
+		slog.WarnContext(ctx, "fallback using noop metric exporter")
+		slog.WarnContext(ctx, "since the stdout exporter is for the fallback if HTTP failed, so this is required")
+		return func(ctx context.Context) error {
+			otel.SetMeterProvider(otelMetricNoop.NewMeterProvider())
+			return nil
+		}
+	}
 
 	var metricExporter otelSdkMetric.Exporter
-	var metricExporterErr error
+	if otelHTTPMetricEnabled {
+		slog.InfoContext(ctx, "OpenTelemetry metric HTTP Exporter enabled")
+		var metricExporterErr error
 
-	otelHTTPEndpoint = strings.TrimSpace(otelHTTPEndpoint)
-	metricExporter, metricExporterErr = otlpmetrichttp.New(ctx,
-		otlpmetrichttp.WithInsecure(),
-		otlpmetrichttp.WithEndpoint(otelHTTPEndpoint),
-		otlpmetrichttp.WithURLPath("/v1/metrics"),
-		otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
-		otlpmetrichttp.WithRetry(otlpmetrichttp.RetryConfig{
-			Enabled:         true,
-			InitialInterval: 5 * time.Second,
-			MaxInterval:     15 * time.Second,
-			MaxElapsedTime:  3 * time.Minute,
-		}),
-	)
+		otelHTTPEndpoint = strings.TrimSpace(otelHTTPEndpoint)
+		metricExporter, metricExporterErr = otlpmetrichttp.New(ctx,
+			otlpmetrichttp.WithInsecure(),
+			otlpmetrichttp.WithEndpoint(otelHTTPEndpoint),
+			otlpmetrichttp.WithURLPath("/v1/metrics"),
+			otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
+			otlpmetrichttp.WithRetry(otlpmetrichttp.RetryConfig{
+				Enabled:         true,
+				InitialInterval: 5 * time.Second,
+				MaxInterval:     15 * time.Second,
+				MaxElapsedTime:  3 * time.Minute,
+			}),
+		)
 
-	if metricExporterErr != nil {
-		slog.WarnContext(ctx, "failed to create the OpenTelemetry metric HTTP exporter", slog.Any("error", metricExporterErr))
-		slog.WarnContext(ctx, "fallback using stdout metric exporter")
-		metricExporter, metricExporterErr = stdoutmetric.New()
-
-		// Check once again if metricExporterErr is not nil (probably from stdoutmetric.New())
 		if metricExporterErr != nil {
-			slog.ErrorContext(ctx, "failed to create the OpenTelemetry metric stdout exporter", slog.Any("error", metricExporterErr))
+			slog.WarnContext(ctx, "failed to create the OpenTelemetry metric HTTP exporter", slog.Any("error", metricExporterErr))
+			slog.WarnContext(ctx, "fallback using stdout metric exporter")
+			metricExporter = metricExporterStdout
+		} else {
+			slog.WarnContext(ctx, "using OpenTelemetry HTTP Exporter", slog.String("endpoint", otelHTTPEndpoint))
 		}
-	} else {
-		slog.WarnContext(ctx, "using OpenTelemetry HTTP Exporter", slog.String("endpoint", otelHTTPEndpoint))
 	}
 
 	if metricExporter == nil {
-		slog.ErrorContext(ctx, "cannot prepare OpenTelemetry Exporter", slog.Any("error", metricExporterErr))
+		slog.ErrorContext(ctx, "cannot prepare OpenTelemetry Exporter because it is nil")
 		otel.SetMeterProvider(otelMetricNoop.NewMeterProvider())
 		return func(context.Context) error {
 			return nil
@@ -179,6 +196,7 @@ func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPEn
 	if prometheusExporterErr != nil {
 		slog.ErrorContext(ctx, "failed to create the Prometheus exporter", slog.Any("error", prometheusExporterErr))
 	} else {
+		slog.InfoContext(ctx, "Prometheus exporter enabled")
 		meterProviderOpts = append(meterProviderOpts, otelSdkMetric.WithReader(prometheusExporter))
 	}
 
