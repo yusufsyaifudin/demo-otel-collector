@@ -34,7 +34,7 @@ export default function () {
     // Generate random payload
     const payload = generateRandomPayload();
 
-    let res = http.post("http://192.168.1.34:8082/login", payload, {
+    let res = http.post("http://192.168.18.249:8082/login", payload, {
         headers: {
             'Content-Type': 'application/json',
         }

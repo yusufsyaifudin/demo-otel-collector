@@ -307,7 +307,6 @@ func MetricsMiddleware(svcName string) func(http.Handler) http.Handler {
 			tags := []attribute.KeyValue{
 				attribute.String("http.method", r.Method),
 				attribute.String("http.route", r.URL.Path),
-				attribute.String("http.status", r.URL.Path),
 			}
 
 			// Increment the request count
