@@ -52,7 +52,9 @@ func main() {
 		// OpenTemeletryHTTPEndpoint contains OpenTelemetry HTTP Exporter, for example: "localhost:4318"
 		// No need scheme "http://" or "https://" prefix.
 		OpenTemeletryHTTPEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
-		OtlpMetricHTTPEnabled     = os.Getenv("OTLP_METRIC_HTTP_ENABLED")
+
+		// OtlpMetricHTTPEnabled Disable the HTTP exporter (only expose /metrics Prometheus endpoint as metrics)
+		OtlpMetricHTTPEnabled = os.Getenv("OTLP_METRIC_HTTP_ENABLED")
 	)
 
 	const (
@@ -142,7 +144,7 @@ func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPMe
 		}
 	}
 
-	var metricExporter otelSdkMetric.Exporter
+	var metricExporter = metricExporterStdout
 	if otelHTTPMetricEnabled {
 		slog.InfoContext(ctx, "OpenTelemetry metric HTTP Exporter enabled")
 		var metricExporterErr error

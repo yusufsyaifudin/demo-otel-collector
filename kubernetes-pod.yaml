@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
     - name: dd-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-e367ed2
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-72fdd80
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
@@ -47,7 +47,7 @@ metadata:
 spec:
   containers:
     - name: otel-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-e367ed2
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-72fdd80
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
@@ -55,8 +55,9 @@ spec:
         # Must be an HTTP endpoint
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           value: "opentelemetry-collector.otel-collector.svc:4318"
+        # Disable the HTTP exporter (only expose /metrics Prometheus endpoint as metrics)
         - name: OTLP_METRIC_HTTP_ENABLED
-          value: "true"
+          value: "false"
       ports:
         - name: otel-sdk-http
           containerPort: 8082
