@@ -55,6 +55,9 @@ func main() {
 
 		// OtlpMetricHTTPEnabled Disable the HTTP exporter (only expose /metrics Prometheus endpoint as metrics)
 		OtlpMetricHTTPEnabled = os.Getenv("OTLP_METRIC_HTTP_ENABLED")
+
+		// OtelExporterOtlpMetricsEndpoint is the OpenTelemetry HTTP Exporter endpoint.
+		OtelExporterOtlpMetricsEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
 	)
 
 	const (
@@ -88,7 +91,12 @@ func main() {
 		otelMetricEnabled = false
 	}
 
-	meterCloser := initMeter(ctx, otelSdkResources, otelMetricEnabled, OpenTemeletryHTTPEndpoint)
+	if OtelExporterOtlpMetricsEndpoint == "" {
+		slog.WarnContext(ctx, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is empty, fallback to OTEL_EXPORTER_OTLP_ENDPOINT")
+		OtelExporterOtlpMetricsEndpoint = OpenTemeletryHTTPEndpoint
+	}
+
+	meterCloser := initMeter(ctx, otelSdkResources, otelMetricEnabled, OtelExporterOtlpMetricsEndpoint)
 	defer func() {
 		if _err := meterCloser(ctx); _err != nil {
 			slog.ErrorContext(ctx, "shutdown otel meter error", slog.Any("error", _err))
@@ -131,7 +139,12 @@ func main() {
 	}
 }
 
-func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPMetricEnabled bool, otelHTTPEndpoint string) func(ctx context.Context) error {
+func initMeter(
+	ctx context.Context,
+	otelResources *resource.Resource,
+	otelHTTPMetricEnabled bool,
+	otelHTTPEndpoint string,
+) func(ctx context.Context) error {
 
 	metricExporterStdout, metricExporterStdoutErr := stdoutmetric.New()
 	if metricExporterStdoutErr != nil {
@@ -153,7 +166,6 @@ func initMeter(ctx context.Context, otelResources *resource.Resource, otelHTTPMe
 		metricExporter, metricExporterErr = otlpmetrichttp.New(ctx,
 			otlpmetrichttp.WithInsecure(),
 			otlpmetrichttp.WithEndpoint(otelHTTPEndpoint),
-			otlpmetrichttp.WithURLPath("/v1/metrics"),
 			otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
 			otlpmetrichttp.WithRetry(otlpmetrichttp.RetryConfig{
 				Enabled:         true,
