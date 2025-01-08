@@ -1,41 +1,41 @@
-apiVersion: v1
-kind: Pod
-metadata:
-  name: demo-otel-collector-dd-sdk
-  labels:
-    app: demo-otel-collector-dd-sdk
-spec:
-  containers:
-    - name: dd-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-1824b44
-      imagePullPolicy: IfNotPresent
-      env:
-        - name: PORT
-          value: ":8081"
-        # Must expose port 8125 for the agent to send traces, and port 8126 for statsd.
-        - name: DATADOG_AGENT_HOST
-          value: "datadog-apm.datadog.svc"
-      ports:
-        - name: dd-sdk-http
-          containerPort: 8081
-          hostPort: 8081
-          protocol: TCP
-  restartPolicy: Always
-
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: demo-otel-collector-dd-sdk
-spec:
-  selector:
-      app: demo-otel-collector-dd-sdk
-  ports:
-      - name: dd-sdk-http
-        protocol: TCP
-        port: 80
-        targetPort: 8081
-  type: ClusterIP
+#apiVersion: v1
+#kind: Pod
+#metadata:
+#  name: demo-otel-collector-dd-sdk
+#  labels:
+#    app: demo-otel-collector-dd-sdk
+#spec:
+#  containers:
+#    - name: dd-sdk
+#      image: ghcr.io/yusufsyaifudin/demo-otel-collector:dd-sdk-sha-30cd4b9
+#      imagePullPolicy: IfNotPresent
+#      env:
+#        - name: PORT
+#          value: ":8081"
+#        # Must expose port 8125 for the agent to send traces, and port 8126 for statsd.
+#        - name: DATADOG_AGENT_HOST
+#          value: "datadog-apm.datadog.svc"
+#      ports:
+#        - name: dd-sdk-http
+#          containerPort: 8081
+#          hostPort: 8081
+#          protocol: TCP
+#  restartPolicy: Always
+#
+#---
+#apiVersion: v1
+#kind: Service
+#metadata:
+#  name: demo-otel-collector-dd-sdk
+#spec:
+#  selector:
+#      app: demo-otel-collector-dd-sdk
+#  ports:
+#      - name: dd-sdk-http
+#        protocol: TCP
+#        port: 80
+#        targetPort: 8081
+#  type: ClusterIP
 
 ---
 apiVersion: v1
@@ -47,7 +47,7 @@ metadata:
 spec:
   containers:
     - name: otel-sdk
-      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-1824b44
+      image: ghcr.io/yusufsyaifudin/demo-otel-collector:otel-sdk-sha-30cd4b9
       imagePullPolicy: IfNotPresent
       env:
         - name: PORT
@@ -55,11 +55,19 @@ spec:
         # Must be an HTTP endpoint
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
           # value: "opentelemetry-collector.otel-collector.svc:4318"
-          # value: "staging-opentelemetry-collector.otel-collector-staging.svc:4318"
-          value: "mimir-production-distributor.grafana-mimir-production.svc:8080"
-        # Disable/Enable the HTTP exporter (only expose /metrics Prometheus endpoint as metrics)
+          value: "staging-opentelemetry-collector.otel-collector-staging.svc:4318"
+          # value: "mimir-production-distributor.grafana-mimir-production.svc:8080"
+        # Disable/Enable the HTTP exporter
+        - name: OTLP_TRACE_HTTP_ENABLED
+          value: "false"
         - name: OTLP_METRIC_HTTP_ENABLED
           value: "true"
+        # Must be an HTTP path
+        - name: OTLP_TRACES_PATH
+          value: "/v1/traces"
+        - name: OTLP_METRICS_PATH
+          value: "/otlp/v1/metrics"
+
       ports:
         - name: otel-sdk-http
           containerPort: 8082

@@ -53,11 +53,17 @@ func main() {
 		// No need scheme "http://" or "https://" prefix.
 		OpenTemeletryHTTPEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT")
 
+		// OtlpTraceHTTPEnabled Disable the HTTP exporter (only expose /traces endpoint as traces)
+		OtlpTraceHTTPEnabled = os.Getenv("OTLP_TRACE_HTTP_ENABLED")
+
 		// OtlpMetricHTTPEnabled Disable the HTTP exporter (only expose /metrics Prometheus endpoint as metrics)
 		OtlpMetricHTTPEnabled = os.Getenv("OTLP_METRIC_HTTP_ENABLED")
 
-		// OtelExporterOtlpMetricsEndpoint is the OpenTelemetry HTTP Exporter endpoint.
-		OtelExporterOtlpMetricsEndpoint = os.Getenv("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")
+		// OtlpTracesPath is the path for the traces endpoint, by default it is "/v1/traces"
+		OtlpTracesPath = os.Getenv("OTLP_TRACES_PATH")
+
+		// OtlpMetricsPath is the path for the metrics endpoint, by default it is "/v1/metrics"
+		OtlpMetricsPath = os.Getenv("OTLP_METRICS_PATH")
 	)
 
 	const (
@@ -78,7 +84,17 @@ func main() {
 		attribute.String("team", teamName),
 	)
 
-	tracerCloser := initTracer(ctx, otelSdkResources, OpenTemeletryHTTPEndpoint)
+	otelTraceEnabled, otelTraceEnabledErr := strconv.ParseBool(OtlpTraceHTTPEnabled)
+	if otelTraceEnabledErr != nil {
+		slog.WarnContext(ctx, "failed to parse OtlpTraceHTTPEnabled", slog.Any("error", otelTraceEnabledErr))
+		otelTraceEnabled = false
+	}
+
+	if OtlpTracesPath == "" {
+		OtlpTracesPath = "/v1/traces"
+	}
+
+	tracerCloser := initTracer(ctx, otelSdkResources, otelTraceEnabled, OpenTemeletryHTTPEndpoint, OtlpTracesPath)
 	defer func() {
 		if _err := tracerCloser(ctx); _err != nil {
 			slog.ErrorContext(ctx, "shutdown otel tracer error", slog.Any("error", _err))
@@ -91,12 +107,11 @@ func main() {
 		otelMetricEnabled = false
 	}
 
-	if OtelExporterOtlpMetricsEndpoint == "" {
-		slog.WarnContext(ctx, "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT is empty, fallback to OTEL_EXPORTER_OTLP_ENDPOINT")
-		OtelExporterOtlpMetricsEndpoint = OpenTemeletryHTTPEndpoint
+	if OtlpMetricsPath == "" {
+		OtlpMetricsPath = "/v1/metrics"
 	}
 
-	meterCloser := initMeter(ctx, otelSdkResources, otelMetricEnabled, OtelExporterOtlpMetricsEndpoint)
+	meterCloser := initMeter(ctx, otelSdkResources, otelMetricEnabled, OpenTemeletryHTTPEndpoint, OtlpMetricsPath)
 	defer func() {
 		if _err := meterCloser(ctx); _err != nil {
 			slog.ErrorContext(ctx, "shutdown otel meter error", slog.Any("error", _err))
@@ -144,6 +159,7 @@ func initMeter(
 	otelResources *resource.Resource,
 	otelHTTPMetricEnabled bool,
 	otelHTTPEndpoint string,
+	otelHTTPPath string,
 ) func(ctx context.Context) error {
 
 	metricExporterStdout, metricExporterStdoutErr := stdoutmetric.New()
@@ -166,6 +182,7 @@ func initMeter(
 		metricExporter, metricExporterErr = otlpmetrichttp.New(ctx,
 			otlpmetrichttp.WithInsecure(),
 			otlpmetrichttp.WithEndpoint(otelHTTPEndpoint),
+			otlpmetrichttp.WithURLPath(otelHTTPPath),
 			otlpmetrichttp.WithCompression(otlpmetrichttp.GzipCompression),
 			otlpmetrichttp.WithRetry(otlpmetrichttp.RetryConfig{
 				Enabled:         true,
@@ -244,18 +261,24 @@ func initMeter(
 	}
 }
 
-func initTracer(ctx context.Context, otelResources *resource.Resource, otelHTTPEndpoint string) func(ctx context.Context) error {
+func initTracer(
+	ctx context.Context,
+	otelResources *resource.Resource,
+	otelHTTPTraceEnabled bool,
+	otelHTTPEndpoint string,
+	otelHTTPPath string,
+) func(ctx context.Context) error {
 	var tracerExporter otelSdkTrace.SpanExporter = tracetest.NewNoopExporter()
 	var tracerErr error
 
 	otelHTTPEndpoint = strings.TrimSpace(otelHTTPEndpoint)
-	if otelHTTPEndpoint != "" {
+	if otelHTTPTraceEnabled {
 		tracerExporter, tracerErr = otlptrace.New(
 			ctx,
 			otlptracehttp.NewClient(
 				otlptracehttp.WithInsecure(),
 				otlptracehttp.WithEndpoint(otelHTTPEndpoint),
-				otlptracehttp.WithURLPath("/v1/traces"),
+				otlptracehttp.WithURLPath(otelHTTPPath),
 				otlptracehttp.WithCompression(otlptracehttp.GzipCompression),
 				otlptracehttp.WithRetry(otlptracehttp.RetryConfig{
 					Enabled:         true,
@@ -265,6 +288,8 @@ func initTracer(ctx context.Context, otelResources *resource.Resource, otelHTTPE
 				}),
 			),
 		)
+	} else {
+		slog.WarnContext(ctx, "OpenTelemetry trace HTTP Exporter disabled")
 	}
 
 	if tracerErr != nil {
